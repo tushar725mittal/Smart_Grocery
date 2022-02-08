@@ -3,6 +3,9 @@ eclat implementation with matrix for lower support items
 """
 import csv
 import matplotlib.pyplot as plt
+import json 
+import sys
+import jsonpickle
 #filling the dict with item->purchase no.
 def itemdict_initialize(item_dict,datacsv,item_list):
     with open(datacsv,mode="r",encoding='utf-8-sig') as file:
@@ -40,91 +43,148 @@ if __name__=="__main__":
     x1=[]
     y1=[]
     y2=[]
+    #master dict to map item_matrix with its most popular side purchases
+    item_matrix={}
 
-    ##lOADING TEST CASES
-    test=[]
-    with open("Grocery_Test.csv",mode="r",encoding='utf-8-sig') as file:
-        csvfile=csv.reader(file)
-        for line in csvfile:
-            lst=[]
-            for item in line:
-                if item=='':
-                    break
-                else:
-                    lst.append(item)
-            test.append(lst)
-    #MAKING THE DICT FOR ECLAT
-    for i in range(1,16):
-        s_value=i*10
-        x1.append(i)
-        y1.append(s_value/169)
-        #item parining wuth order no. dict
-        item_order={}
-        #list for maintaining the item pairings
-        item_l=[]
-        #initializing the item dict
-        item_order,item_l=itemdict_initialize(item_order,"Grocery_Products_Purchase.csv",item_l)
-        with open("Grocery_Result_ECLAT.csv",mode="w") as csvfile:
-            csvwriter=csv.writer(csvfile)
-            while(len(item_l)>1):
-                item_l=pairmaker(item_l,s_value,item_order)
-                for x in item_l:
-                    csvwriter.writerow(x.split(","))
-        item_matrix_7={}
-        with open("Grocery_Result_ECLAT.csv",mode="r",encoding='utf-8-sig') as file:
-            csvfile=csv.reader(file)
-            for lines in csvfile:
-                if len(lines)==0:
-                    continue
-                for i in lines:
-                    main_item=i
-                    for j in lines:
-                        if i==j:
-                            continue
-                        if i in item_matrix_7:
-                            item_matrix_7[i].add(j)
-                        else:
-                            item_matrix_7[i]={j}
-        ##TESTING ACCURACY
-        valid_cases=0
-        score=[] #stores the accuracy of the recommendation(betwween 0-1)
-        for i in test:
-            if len(i)<=1:
-                continue
-            valid_cases+=1
-            main_item=i[0]
-            actual_item=i[1:]
-            len_a=len(actual_item)
-            set_a=set(actual_item)
-            if main_item in item_matrix_7:
-                score.append(len(set_a.intersection(item_matrix_7[main_item]))/len_a)
-        score=sum(score)/valid_cases
-        y2.append(score)
-     
-    #FOR PLOTTING support v/s accuracy
-    default_x_ticks = range(len(x1))
-    plt.plot(default_x_ticks, y1,'r-',label='Support')
-    plt.plot(default_x_ticks, y2,'b-',label='Accuracy')
-    plt.xticks(default_x_ticks, x1)
-    plt.grid()
-    plt.legend(loc='best')
-    plt.savefig('testplot_woMatrix.png')
+    item_count={}
 
-#To print favourite brand of the user from brand purchase history
-user_brand={}
-with open("Grocery_Brands_Purchase.csv",mode="r",encoding='utf-8-sig') as file:
+    order_count=0
+    #opening product purchases and adding freq of related item_matrix line by line
+    with open("Grocery_Products_Purchase.csv",mode="r",encoding='utf-8-sig') as file:
         csvfile=csv.reader(file)
         for lines in csvfile:
-            user=lines[0]
-            if user not in user_brand:
-                user_brand[user]={}
-            for item in lines[1:]:
-                if item=='':
+            order_count+=1
+            for itemA in lines:
+                if itemA=='':
                     break
-                if item in user_brand[user]:
-                    user_brand[user][item]+=1
+                if itemA in item_count:
+                    item_count[itemA]+=1
+                if itemA not in item_count:
+                    item_count[itemA]=1
+                for itemB in lines:
+                    if itemA==itemB or itemB=='':
+                        continue
+                    else:
+                        if itemA not in item_matrix:
+                            item_matrix[itemA]={}
+                        if itemB in item_matrix[itemA]:
+                            item_matrix[itemA][itemB]+=1
+                        if itemB not in item_matrix[itemA]:
+                            item_matrix[itemA][itemB]=1
+                        if itemB in item_count:
+                            item_count[itemB]+=1
+                        if itemB not in item_count:
+                            item_count[itemB]=1
+    ##for a pairing i->j
+    #results when sorting by confidence support i->j
+    with open("Grocey_Result_Confidence_1.csv",mode="w") as csvfile1:
+        csvwriter1=csv.writer(csvfile1)
+        for i in item_matrix:
+            list1=[]
+            for t in item_matrix[i]:
+                confidence_t_i=item_matrix[i][t]/item_count[t]
+                confidence_i_t=item_matrix[i][t]/item_count[i]
+                list1.append((t,confidence_i_t))
+            list1=sorted(list1,reverse=True,key=lambda x:x[1])
+            list1=[x[0] for x in list1]
+            csvwriter1.writerow([i]+list1)
+
+    #MAKING THE DICT FOR ECLAT
+    # for i in range(1,16):
+    s_value=70
+    x1.append(i)
+    y1.append(s_value/169)
+    #item parining wuth order no. dict
+    item_order={}
+    #list for maintaining the item pairings
+    item_l=[]
+    #initializing the item dict
+    item_order,item_l=itemdict_initialize(item_order,"Grocery_Products_Purchase.csv",item_l)
+    with open("Grocery_Result_ECLAT.csv",mode="w") as csvfile:
+        csvwriter=csv.writer(csvfile)
+        while(len(item_l)>1):
+            item_l=pairmaker(item_l,s_value,item_order)
+            for x in item_l:
+                csvwriter.writerow(x.split(","))
+
+    ### for test###
+    item_matrix_eclat={}
+    with open("Grocery_Result_ECLAT.csv",mode="r",encoding='utf-8-sig') as file:
+        csvfile=csv.reader(file)
+        for lines in csvfile:
+            if len(lines)==0:
+                continue
+            for i in lines:
+                main_item=i
+                for j in lines:
+                    if i==j:
+                        continue
+                    if i in item_matrix_eclat:
+                        item_matrix_eclat[i].add(j)
+                    else:
+                        item_matrix_eclat[i]={j}
+    
+    #importing reusltant pairing matrices from their respectives csv
+    item_matrix_matrix={}
+    with open("Grocey_Result_Confidence_1.csv",mode="r",encoding='utf-8-sig') as file:
+        csvfile=csv.reader(file)
+        for lines in csvfile:
+            if len(lines)==0:
+                continue
+            main_item=lines[0]
+            if main_item in item_matrix_eclat:
+                if len(item_matrix_eclat[main_item])>4:
+                    continue
+            if len(lines)>1:
+                item_matrix_matrix[main_item]=set([x for x in lines[1:10]])
+            else:
+                item_matrix_matrix[main_item]=set()
+
+    #importing subcategories of the items
+    item_catg={}
+    with open("Grocery_Categories.csv",mode="r",encoding='utf-8-sig') as file:
+        csvfile=csv.reader(file)
+        for lines in csvfile:
+            for i,x in enumerate(lines):
+                if x=='':
+                    break
+                if i==0:
+                    item_main=x
+                    item_catg[x]=[]
                 else:
-                    user_brand[user][item]=0
-for user in user_brand:
-    user_brand[user]=sorted(user_brand[user],reverse=True,key=lambda x:user_brand[user][x])
-    print(user,user_brand[user][0:6])
+                    item_catg[item_main].append(x)
+
+        
+    
+user_items=int(input("Number of items you want initially:"))
+if user_items==0:
+    print("Number should be more than one!")
+res_user=set()
+for t in range(user_items):
+    print("---")
+    print("Item number:",t+1)
+    print()
+    print("Item Categories:")
+    for i in item_catg:
+        print(i)
+    print()
+    catg=str(input("Your Choice:"))
+    print()
+    print("Items in the Category:")
+    for i in item_catg[catg]:
+        print(i)
+    print()
+    strng=str(input("Your Choice:"))
+    print()
+    if strng in item_matrix_eclat:
+        if len(res_user)==0:
+            res_user=res_user.union(item_matrix_eclat[strng])
+        else:
+            res_user=res_user.intersection(item_matrix_eclat[strng])
+    else:
+        if len(res_user)==0:
+            res_user=res_user.union(item_matrix_matrix[strng])
+        else:
+            res_user=res_user.intersection(item_matrix_matrix[strng])
+print("Your recommended Items:")
+print(res_user)
