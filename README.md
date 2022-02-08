@@ -4,3 +4,6 @@
 -ECLAT and Matrix association hybris is used to deliver recommendation for both high and low support items efficiently.
 
 -Implementing a GUI representation using HTML and Javascript.
+
+# To run-
+Execute Recommendation_using_ECLAT_wMatrix.py (deploy.html still in dev)
