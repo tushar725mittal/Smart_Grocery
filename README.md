@@ -5,5 +5,5 @@
 
 -Implementing a GUI representation using HTML and Javascript.
 
-<h2>To run-</h2>
+<h2>To run-</h2> 
 Execute Recommendation_using_ECLAT_wMatrix.py (deploy.html still in dev)
